@@ -14,3 +14,10 @@ $routes->group('/cursos', function ($routes) {
     $routes->put('/atualizar', 'CursoController::update');
     $routes->delete('/deletar', 'CursoController::update');
 });
+
+$routes->group('controle-refeicoes', function ($routes) {
+    $routes->get('', 'ControleRefeicoesController::index');
+    $routes->post('salvar', 'ControleRefeicoesController::salvar');
+    $routes->post('atualizar', 'ControleRefeicoesController::atualizar');
+    $routes->post('deletar', 'ControleRefeicoesController::deletar');
+});
