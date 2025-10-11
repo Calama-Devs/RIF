@@ -26,35 +26,27 @@ class WebhookController extends BaseController
         $alunoTelefoneModel = new AlunoTelefoneModel();
         $evolutionAPI = new EvolutionAPI();
 
-        //a resposta do aluno
+        //resposta do webhook
         $dados = $this->request->getJSON(true); 
-
-        log_message('info', 'Webhook recebido -> ' . json_encode($dados));
-
-        if (!isset($dados['event'])) {
-            return $this->response->setJSON(['status' => 'evento inválido']);
-        }
 
         $evento = $dados['event'];
         $data = $dados['data'];
 
         if ($evento === 'messages.upsert') {
 
-            // if (isset($data['key']['fromMe']) && $data['key']['fromMe'] === true) {
-            //     return $this->response->setJSON(['status' => 'mensagem do bot ignorada']);
-            // }
-
-            // if (!isset($data['message']['conversation'])) {
-            //     return $this->response->setJSON(['status' => 'mensagem sem texto']);
-            // }
+            //ignorar as mensagens do telefone de origem
+            if ($data['key']['fromMe'] === true) {
+                return;
+            }
 
             $destinatarioSujo = $data['key']['remoteJid'];
-            $destinatarioCompleto = str_replace('@s.whatsapp.net', '', $destinatarioSujo); 
-            $ddd_e_numero  =  substr($destinatarioCompleto, 2); //sem o dd de pais por enquanto
+            $destinatarioCompleto = str_replace('@s.whatsapp.net', '', $destinatarioSujo); //destinatario completo = com dd de país
+            $ddd_e_numero  =  substr($destinatarioCompleto, 2); // dd da cidade e o telefone
 
             $ddd = substr($ddd_e_numero, 0, 2); 
             $numero = substr($ddd_e_numero, 2);
 
+            // acrescenta um 9 se tiver apenas 8 números
             if (strlen($numero) === 8) {
                 $destinatario = $ddd . '9' . $numero;
             } else {
@@ -72,6 +64,7 @@ class WebhookController extends BaseController
             $mensagem = $mensagemModel
                 ->where('destinatario', $destinatario)
                 ->where('status', 1)
+                ->where('categoria', 0)
                 ->orderBy('id', 'DESC')
                 ->first();
 
@@ -84,10 +77,18 @@ class WebhookController extends BaseController
                 ->first();
 
             $mensagemRetorno = '';
+            $dadosAtualizacao = [
+                'data_confirmacao' => date('Y-m-d H:i:s') 
+            ];
 
             if ($resposta === '1') {
+
                 $refeicaoModel->update($refeicao['id'], ['status' => 1]);
-                $mensagemRetorno = 'Refeição confirmada.';
+
+                $dataRefeicao = $refeicao['data_refeicao'];
+
+                $this->criarMensagemQrCode($alunoMatricula, $destinatario, $dataRefeicao); 
+                $mensagemRetorno = 'Refeição confirmada. Você receberá o QR Code em breve!';
 
             } else if ($resposta === '2') {
                 $refeicaoModel->update($refeicao['id'], ['status' => 3]);
@@ -98,12 +99,35 @@ class WebhookController extends BaseController
             }
 
             $evolutionAPI->sendMessage($destinatario, $mensagemRetorno);
-            return $this->response->setJSON(['mensagem' => 'Processamento concluído: ' . $mensagemRetorno]);
+            return;
         }
         else{
-            return $this->response->setJSON(['status' => 'demais eventos']);
+            return;
         }
 
         
+    }
+
+
+    public function criarMensagemQrCode(int $alunoId, string $destinatario, string $dataRefeicao)
+    {
+        $enviaModel = new EnviarMensagensModel();
+        $dataFormatada = (new \DateTime($dataRefeicao))->format('d/m/Y');
+
+        $mensagem = "Esse é o qrCode a ser utilizado no dia {$dataFormatada}, lembre-se esse qrCode é uso único e exclusivo na data respectiva e do titular.";
+
+        $dadosMensagem = [
+            'destinatario'  => $destinatario,
+            'mensagem'      => $mensagemCompleta, 
+            'status'        => 0, 
+            'categoria'     => 1, 
+        ];
+
+        if ($enviaModel->insert($dadosMensagem)) {
+            return true;
+        }
+
+        return false;
+    
     }
 }

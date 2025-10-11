@@ -183,6 +183,7 @@ class AgendamentoController extends BaseController
                             'destinatario' => $destinatario,
                             'mensagem'     => $mensagem,
                             'status'       => 0, // Pendente
+                            'categoria'    => 0,
                         ]);
                     }
                 }
