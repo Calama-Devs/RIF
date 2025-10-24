@@ -22,9 +22,15 @@ class GroupFilter implements FilterInterface
 
         $user = $auth->user();
 
+        // 🛑 REFORÇO DE SEGURANÇA: Previne o erro "Call to a member function inGroup() on null"
+        // Este é um teste de fallback para problemas de timing/cache.
+        if ($user === null) {
+             return redirect()->to(config('Auth')->loginRoute)->with('error', 'Sessão inválida. Por favor, faça login novamente.');
+        }
+
         // Verifica se os argumentos de grupo foram fornecidos.
         if (empty($arguments) || empty($arguments[0])) {
-            return redirect()->back()->with('error', 'Ops! Erro de Configuração. Grupos não definidos.');
+            return redirect()->to('/')->with('error', 'Erro de Configuração. Grupos não definidos.');
         }
 
         // Pega a lista de grupos permitidos da rota (ex: "admin,developer").
